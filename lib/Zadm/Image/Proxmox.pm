@@ -2,9 +2,25 @@ package Zadm::Image::Proxmox;
 use Mojo::Base 'Zadm::Image::base', -signatures;
 
 use Mojo::URL;
+use Mojo::UserAgent;
+use Mojo::DOM;
 
-has baseurl  => sub { Mojo::URL->new('http://download.proxmox.com') };
-has index    => sub($self) { Mojo::URL->new('/images/aplinfo.dat')->base($self->baseurl)->to_abs };
+has baseurl  => sub { Mojo::URL->new('http://download.proxmox.com/') };
+has index => sub ($self) {
+    my $ua = Mojo::UserAgent->new;
+    my $res = $ua->get($self->baseurl)->result;
+    return '' unless $res->is_success;
+
+    for my $link ($dom->find('a')->each) {
+        next unless $link->attr('href') =~ /\.dat$/;
+        my $dat_url = $self->baseurl->clone->path($link->attr('href'));
+        my $dat_res = $ua->get($dat_url)->result;
+        next unless $dat_res->is_success;
+        push @dat_contents, $dat_res->body;
+    }
+
+    return join("\n", @dat_contents);
+};
 
 sub postProcess($self, $text = '') {
     my @imgs;
